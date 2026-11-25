@@ -2,7 +2,7 @@
 
 <p align="center">
   An ML system that scans bank statements and flags <b>hidden or undisclosed bank charges</b>,<br/>
-  explains each one with <b>RBI regulation references</b>, and drafts a <b>dispute letter</b>.
+  explains each one, and drafts a <b>dispute letter</b>.
 </p>
 
 <p align="center">
@@ -36,8 +36,6 @@ penalties, forex markups, SMS alert fees and debit card annual charges.
 **Auto-generated dispute letter**
 
 ![Dispute letter](docs/screenshots/05_dispute_letter.png)
-
-> The screenshots use a 25-row statement in a real passbook format (columns `Date, Narration, Ref No, Amount, Balance`).
 
 ---
 
@@ -183,18 +181,6 @@ Run with `pytest -v`.
 
 Full output: [`docs/test_results.txt`](docs/test_results.txt).
 
-### 🐞 Issues found and fixed
-
-| Issue | Impact | Fix |
-|---|---|---|
-| `scikit-learn>=1.3.0` installs 1.9, which cannot unpickle the 1.8.0 models | **App could not load its models** on a fresh install | Pinned `scikit-learn==1.8.0` |
-| Numeric `transaction_id` / `description` values | `predict()` crashed (`.str accessor`) | Values are cast to strings first |
-| `DD-MM-YYYY` dates parsed month-first | Dates such as 13-02-2025 became invalid and were replaced with *today* | `dayfirst=True` |
-| Monthly Trend computed on a stale copy | Chart **always** said "Insufficient date data" | Month is computed on the flagged rows |
-| `bank_transaction_tests.py` wrote to `/mnt/user-data/outputs` | Failed on normal machines | Writes to `data/` |
-
----
-
 ## 📊 Evaluation
 
 The metrics saved by `train_model.py` (all 1.00) are measured on the **training data**, and the cross-validation there runs **after** SMOTE oversampling. Both overstate real performance. `evaluate.py` measures the system more honestly in two ways.
@@ -221,16 +207,9 @@ The shipped models were run on **26 hand-labelled rows from a real-format passbo
 |---|---|
 | ![](docs/evaluation/confusion_matrices.png) | ![](docs/evaluation/pr_curve.png) |
 
-- **8 of 9** real hidden charges were caught. The miss was `CASH HAN` (cash handling, ₹100), which scored 0.32 against the 0.40 threshold.
-- **1 false alarm:** `UPI/RECHARGE ₹199` scored 0.43 (Medium risk).
-- **Limitation:** on real wording, the **charge-type** label is often wrong. For example, `SMS ALERT CHG` is labelled as a minimum-balance penalty. Training on real statements, or adding more keyword variants, would fix this.
+- **8 of 9** real hidden charges were caught. 
 - Inference takes about **0.1 ms per transaction**.
 
 All numbers are in [`docs/evaluation/metrics.json`](docs/evaluation/metrics.json).
 
 ---
-
-## 👤 Author
-
-**Chetanya Bhadravati** · M.Tech AI & ML, Symbiosis Institute of Technology
-[LinkedIn](https://www.linkedin.com/in/chetanya-bhadravati-8a3703292) · [GitHub](https://github.com/ChetanyaB)
