@@ -102,7 +102,8 @@ def parse_csv(file_obj) -> pd.DataFrame:
 
         # Standardize timestamp
         if "date" in df.columns and "timestamp" not in df.columns:
-            df["timestamp"] = pd.to_datetime(df["date"],
+            # Indian statements use DD-MM-YYYY, so parse day-first
+            df["timestamp"] = pd.to_datetime(df["date"], dayfirst=True,
                                               errors="coerce")
             df["timestamp"] = df["timestamp"].fillna(pd.Timestamp.now())
 

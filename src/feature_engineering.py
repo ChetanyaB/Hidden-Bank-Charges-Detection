@@ -59,7 +59,7 @@ SYSTEM_CHANNELS = {"SYSTEM", "ACH"}
 def extract_text_features(df: pd.DataFrame) -> pd.DataFrame:
     """Extract NLP-based features from description text."""
     df = df.copy()
-    desc = df["description"].fillna("").str.lower()
+    desc = df["description"].fillna("").astype(str).str.lower()
 
     # Keyword match flags (one-hot for each charge category)
     for category, keywords in HIDDEN_CHARGE_KEYWORDS.items():
@@ -167,7 +167,7 @@ def extract_channel_features(df: pd.DataFrame) -> pd.DataFrame:
 def extract_transaction_id_features(df: pd.DataFrame) -> pd.DataFrame:
     """Extract signals from transaction ID patterns."""
     df = df.copy()
-    tid = df.get("transaction_id", pd.Series([""] * len(df))).fillna("").str.upper()
+    tid = df.get("transaction_id", pd.Series([""] * len(df), index=df.index)).fillna("").astype(str).str.upper()
 
     df["txn_id_is_sal"]   = tid.str.startswith("SAL_").astype(int)   # Salary
     df["txn_id_is_atm"]   = tid.str.contains("ATM").astype(int)
