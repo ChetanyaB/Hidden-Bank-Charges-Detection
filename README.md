@@ -1,12 +1,43 @@
-# 🔍 Hidden Bank Charge Detector
+<h1 align="center">🔍 Hidden Bank Charge Detector</h1>
+
+<p align="center">
+  An ML system that scans bank statements and flags <b>hidden or undisclosed bank charges</b>,<br/>
+  explains each one with <b>RBI regulation references</b>, and drafts a <b>dispute letter</b>.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white"/>
+  <img src="https://img.shields.io/badge/scikit--learn-1.8-F7931E?logo=scikitlearn&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Real--statement%20F1-0.89-blue"/>
+  <img src="https://img.shields.io/badge/tests-14%20passed-brightgreen"/>
+</p>
 
 ---
 
 ## 📌 Overview
 
-An end-to-end machine learning system that analyzes bank transactions  
-and identifies hidden or undisclosed bank charges — such as ATM fees, minimum balance 
-penalties, forex markups, SMS alert fees, debit card annual charges, and more.
+An end-to-end machine learning system that analyses bank transactions
+and identifies hidden or undisclosed bank charges, such as ATM fees, minimum-balance
+penalties, forex markups, SMS alert fees and debit card annual charges.
+
+---
+
+## 📸 Screenshots
+
+| Home & upload | Analysis complete |
+|---|---|
+| ![Home](docs/screenshots/01_home.png) | ![Analyse](docs/screenshots/02_upload_and_analyse.png) |
+
+| Analysis dashboard | Flagged transactions with risk level |
+|---|---|
+| ![Dashboard](docs/screenshots/03_dashboard.png) | ![Flagged](docs/screenshots/04_flagged_transactions.png) |
+
+**Auto-generated dispute letter**
+
+![Dispute letter](docs/screenshots/05_dispute_letter.png)
+
+> The screenshots use a 25-row statement in a real passbook format (columns `Date, Narration, Ref No, Amount, Balance`).
 
 ---
 
@@ -47,14 +78,15 @@ Transactions
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
+> `scikit-learn` is pinned to **1.8.0** because the saved models in `models/` were trained with it. Newer versions cannot load them.
 
-### 2. Train models (first time only)
+### 2. Train models (first time only; pre-trained models are already included)
 ```bash
 python train_model.py --data data/bank_transactions.csv
 ```
@@ -62,6 +94,12 @@ python train_model.py --data data/bank_transactions.csv
 ### 3. Launch the app
 ```bash
 streamlit run app.py
+```
+
+### 4. Run tests and evaluation
+```bash
+pip install pytest && pytest -v
+python evaluate.py          # held-out test + real-statement check → docs/evaluation/
 ```
 
 ---
@@ -72,6 +110,9 @@ streamlit run app.py
 hidden_charge_detector/
 ├── app.py                        # Main Streamlit UI
 ├── train_model.py                # Training entry point
+├── evaluate.py                   # Held-out + real-statement evaluation
+├── tests/test_detector.py        # 14 automated test cases
+├── docs/                         # Screenshots, evaluation plots, metrics
 ├── requirements.txt
 ├── README.md
 ├── data/
@@ -119,4 +160,77 @@ hidden_charge_detector/
 
 ---
 
+## ✅ Test case scenarios
 
+Run with `pytest -v`.
+
+| # | Scenario | Expected result | Status |
+|---|---|---|---|
+| TC01 | Bank-style headers (`Txn Date, Narration, Ref No, Withdrawal, Deposit`) | Columns normalised; debit/credit merged into a signed amount | ✅ Pass |
+| TC02 | Statement with a bank preamble above the header row | Header row detected automatically | ✅ Pass |
+| TC03 | Indian dates `13-02-2025` | Parsed as day-first (13 Feb) | ✅ Pass |
+| TC04 | Unsupported file type | Clear `ValueError` | ✅ Pass |
+| TC05 | ATM / SMS / min-balance / NACH-return charges | All flagged | ✅ Pass |
+| TC06 | Salary, UPI and POS spends | Not flagged | ✅ Pass |
+| TC07 | Charge-type classification | `sms_alert_charges`, `minimum_balance_penalty`, `none` | ✅ Pass |
+| TC08 | Numeric transaction IDs | Works (crashed before the fix) | ✅ Pass |
+| TC09 | Threshold 0.30 vs 0.70 | Lower threshold flags at least as many | ✅ Pass |
+| TC10 | Scores and risk levels | Scores in [0, 1]; valid risk labels | ✅ Pass |
+| TC11 | Explainability | An explanation is produced per flagged row | ✅ Pass |
+| TC12 | Dashboard summary | Totals equal the sum of flagged amounts | ✅ Pass |
+| TC13 | Dispute letter | Includes bank, holder name and the charges | ✅ Pass |
+| TC14 | Monthly trend | Populated per month (was always empty before the fix) | ✅ Pass |
+
+Full output: [`docs/test_results.txt`](docs/test_results.txt).
+
+### 🐞 Issues found and fixed
+
+| Issue | Impact | Fix |
+|---|---|---|
+| `scikit-learn>=1.3.0` installs 1.9, which cannot unpickle the 1.8.0 models | **App could not load its models** on a fresh install | Pinned `scikit-learn==1.8.0` |
+| Numeric `transaction_id` / `description` values | `predict()` crashed (`.str accessor`) | Values are cast to strings first |
+| `DD-MM-YYYY` dates parsed month-first | Dates such as 13-02-2025 became invalid and were replaced with *today* | `dayfirst=True` |
+| Monthly Trend computed on a stale copy | Chart **always** said "Insufficient date data" | Month is computed on the flagged rows |
+| `bank_transaction_tests.py` wrote to `/mnt/user-data/outputs` | Failed on normal machines | Writes to `data/` |
+
+---
+
+## 📊 Evaluation
+
+The metrics saved by `train_model.py` (all 1.00) are measured on the **training data**, and the cross-validation there runs **after** SMOTE oversampling. Both overstate real performance. `evaluate.py` measures the system more honestly in two ways.
+
+### 1. Held-out test (synthetic dataset)
+
+The full pipeline is retrained on a stratified 80% (16,866 transactions) and scored on the untouched 20% (4,217 transactions, 108 hidden charges).
+
+| Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | Charge-type accuracy |
+|---|---|---|---|---|---|---|
+| 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | **0.861** |
+
+Detection is perfect because, in the synthetic dataset, every hidden charge follows a keyword or ID pattern the features capture directly (`ADJ`, `CHRG`, `SYSTEM` channel). The harder task is telling the **17 charge types** apart, which reaches 86%.
+
+### 2. Real-statement check (generalisation)
+
+The shipped models were run on **26 hand-labelled rows from a real-format passbook**, with wording the model never saw in training (`OSMS CHA`, `CASH HAN`, `GST 18% ON Charge`).
+
+| Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
+|---|---|---|---|---|---|
+| **0.923** | **0.889** | **0.889** | **0.889** | 0.967 | 0.960 |
+
+| Confusion matrices | Precision–recall |
+|---|---|
+| ![](docs/evaluation/confusion_matrices.png) | ![](docs/evaluation/pr_curve.png) |
+
+- **8 of 9** real hidden charges were caught. The miss was `CASH HAN` (cash handling, ₹100), which scored 0.32 against the 0.40 threshold.
+- **1 false alarm:** `UPI/RECHARGE ₹199` scored 0.43 (Medium risk).
+- **Limitation:** on real wording, the **charge-type** label is often wrong. For example, `SMS ALERT CHG` is labelled as a minimum-balance penalty. Training on real statements, or adding more keyword variants, would fix this.
+- Inference takes about **0.1 ms per transaction**.
+
+All numbers are in [`docs/evaluation/metrics.json`](docs/evaluation/metrics.json).
+
+---
+
+## 👤 Author
+
+**Chetanya Bhadravati** · M.Tech AI & ML, Symbiosis Institute of Technology
+[LinkedIn](https://www.linkedin.com/in/chetanya-bhadravati-8a3703292) · [GitHub](https://github.com/ChetanyaB)

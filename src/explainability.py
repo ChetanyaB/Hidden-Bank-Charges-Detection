@@ -271,11 +271,12 @@ def compute_summary_stats(df_result: pd.DataFrame) -> dict:
 
     monthly_hidden = pd.DataFrame()
     try:
-        df_result["_month"] = pd.to_datetime(
-            df_result["timestamp"], errors="coerce"
-        ).dt.to_period("M").astype(str)
+        # Month is computed on the flagged rows themselves (the old code added it to
+        # df_result after `flagged` was copied, so the trend chart was always empty)
+        months = pd.to_datetime(flagged["timestamp"], errors="coerce").dt.to_period("M")
         monthly_hidden = (
-            flagged.groupby("_month")["amount"]
+            flagged.assign(_month=months.astype(str))[months.notna()]
+            .groupby("_month")["amount"]
             .agg(count="count", total=lambda x: x.abs().sum())
             .reset_index()
             .rename(columns={"_month": "month"})

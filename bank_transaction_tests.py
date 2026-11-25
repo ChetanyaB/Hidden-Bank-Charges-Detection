@@ -119,7 +119,7 @@ for i, (desc, yt, yp) in enumerate(zip(df["description"], y, loo_res[best]["y_pr
         print(f"    Row {i:>2}: {desc}  (true={yt}, pred={yp})")
 
 # ── plots ─────────────────────────────────────────────────────────────────────
-os.makedirs("/mnt/user-data/outputs", exist_ok=True)
+os.makedirs("data", exist_ok=True)
 fig, axes = plt.subplots(2, 3, figsize=(18, 11))
 fig.suptitle("Hidden Charge Detection — LOO-CV Evaluation", fontsize=14, fontweight="bold")
 
@@ -173,7 +173,7 @@ for col, name in enumerate(model_names):
                  fontweight="bold", fontsize=9)
 
 plt.tight_layout()
-out = "/mnt/user-data/outputs/hidden_charge_results.png"
+out = "data/hidden_charge_results.png"
 plt.savefig(out, dpi=150, bbox_inches="tight")
 
 # ── per-row heatmap ───────────────────────────────────────────────────────────
